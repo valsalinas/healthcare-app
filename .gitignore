@@ -21,3 +21,22 @@ Thumbs.db
 
 #local backup files
 mobile/src/app/index.tsx.backup
+
+# Expo / React Native
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+*.tsbuildinfo
+
+# Local backend config (real credentials)
+backend/config.php
+backend/config.local.php
+
+# Backup and temp files
+*.backup
+*.bak
+*.tmp
+
+# Database dumps with real or test data
+*.sql.gz
