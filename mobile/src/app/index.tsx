@@ -1,26 +1,72 @@
 import { useEffect, useState } from "react";
 import { Button, ScrollView, Text, TextInput, View } from "react-native";
 
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
+
+type Patient = {
+  patient_id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+};
+
+type Doctor = {
+  doctor_id: number;
+  first_name: string;
+  last_name: string;
+  specialty: string;
+};
+
+type Appointment = {
+  appointment_id: number;
+  patient_id: number;
+  patient_name: string;
+  doctor_id: number;
+  doctor_name: string;
+  specialty: string;
+  appointment_datetime: string;
+  reason: string | null;
+  status: string;
+};
+
+// Returns parsed JSON, or throws an Error with the API's "error" message.
+async function apiRequest(url: string, options?: RequestInit) {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(data?.error || `Server error: ${response.status}`);
+  }
+
+  return data;
+}
+
+function errorText(err: unknown, fallback: string) {
+  return err instanceof Error ? err.message : fallback;
+}
+
 export default function HomeScreen() {
   const [patientId, setPatientId] = useState("");
   const [patientName, setPatientName] = useState("");
-  const [patient, setPatient] = useState(null);
-  const [patients, setPatients] = useState([]);
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
   // Appointment state variables
-  const [appointments, setAppointments] = useState([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [appointmentPatientId, setAppointmentPatientId] = useState("");
   const [appointmentDoctorId, setAppointmentDoctorId] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("");
   const [appointmentReason, setAppointmentReason] = useState("");
   const [appointmentError, setAppointmentError] = useState("");
+  const [appointmentsLoadError, setAppointmentsLoadError] = useState("");
   const [appointmentMessage, setAppointmentMessage] = useState("");
 
   // Store the doctors retrieved from the PHP API
-  const [doctors, setDoctors] = useState([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
 
   //Add Patient Form Variables
   const [firstName, setFirstName] = useState("");
@@ -37,95 +83,64 @@ export default function HomeScreen() {
 
   const [deletePatientId, setDeletePatientId] = useState("");
 
+  const loadAppointments = async () => {
+    try {
+      const data = await apiRequest(`${API_BASE_URL}/appointments.php`);
+      setAppointments(data);
+      setAppointmentsLoadError("");
+    } catch (err) {
+      console.log("Load appointments failed:", err);
+      setAppointmentsLoadError("Unable to load appointments.");
+    }
+  };
+
+  const loadDoctors = async () => {
+    try {
+      const data = await apiRequest(`${API_BASE_URL}/doctors.php`);
+      setDoctors(data);
+    } catch (err) {
+      console.log("Load doctors failed:", err);
+    }
+  };
   // Load appointments when the screen first opens
   useEffect(() => {
-    fetch("http://192.168.86.25:8000/appointments.php")
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Server error: ${response.status}`);
-        }
-
-        return response.json();
-      })
-      .then((data) => {
-        setAppointments(data);
-        setAppointmentError("");
-      })
-      .catch((error) => {
-        console.log("Load appointments failed:", error);
-        setAppointmentError("Unable to load appointments.");
-      });
+    loadAppointments();
+    loadDoctors();
   }, []);
 
-  // Load doctors when the screen first opens
-  useEffect(() => {
-    fetch("http://192.168.86.25:8000/doctors.php")
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Server error: ${response.status}`);
-        }
-
-        return response.json();
-      })
-      .then((data) => {
-        setDoctors(data);
-      })
-      .catch((error) => {
-        console.log("Load doctors failed:", error);
-      });
-  }, []);
-
-  const addPatient = () => {
+  const addPatient = async () => {
     setSuccessMessage("");
 
     if (firstName === "" || lastName === "" || email === "" || phone === "") {
       setError("Please fill in all patient fields.");
       return;
     }
-    fetch("http://192.168.86.25:8000/patients.php", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        first_name: firstName,
-        last_name: lastName,
-        email: email,
-        phone: phone,
-      }),
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Server error: ${response.status}`);
-        }
 
-        return response.json();
-      })
-      .then((data) => {
-        console.log(data);
-
-        if (data.error) {
-          setError(data.error);
-          setSuccessMessage("");
-          return;
-        }
-
-        setFirstName("");
-        setLastName("");
-        setEmail("");
-        setPhone("");
-
-        setError("");
-        setSuccessMessage("Patient added successfully!");
-      })
-      .catch((error) => {
-        console.log("Add patient failed:", error);
-        setError(error.message);
-        setSuccessMessage("");
+    try {
+      await apiRequest(`${API_BASE_URL}/patients.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          first_name: firstName,
+          last_name: lastName,
+          email: email,
+          phone: phone,
+        }),
       });
+
+      setFirstName("");
+      setLastName("");
+      setEmail("");
+      setPhone("");
+      setError("");
+      setSuccessMessage("Patient added successfully!");
+    } catch (err) {
+      setError(errorText(err, "Unable to add patient."));
+      setSuccessMessage("");
+    }
   };
 
-  const updatePatient = () => {
+  const updatePatient = async () => {
     if (
       updatePatientId === "" ||
       updateFirstName === "" ||
@@ -137,125 +152,96 @@ export default function HomeScreen() {
       return;
     }
 
-    fetch("http://192.168.86.25:8000/patients.php", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        patient_id: updatePatientId,
-        first_name: updateFirstName,
-        last_name: updateLastName,
-        email: updateEmail,
-        phone: updatePhone,
-      }),
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        console.log(data);
-
-        setError("");
-        setSuccessMessage("Patient updated successfully!");
-
-        setUpdatePatientId(""); //clears the update form after a successful update
-        setUpdateFirstName("");
-        setUpdateLastName("");
-        setUpdateEmail("");
-        setUpdatePhone("");
-      })
-      .catch((error) => {
-        console.log(error);
+    try {
+      await apiRequest(`${API_BASE_URL}/patients.php`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patient_id: updatePatientId,
+          first_name: updateFirstName,
+          last_name: updateLastName,
+          email: updateEmail,
+          phone: updatePhone,
+        }),
       });
+
+      setError("");
+      setSuccessMessage("Patient updated successfully!");
+      setUpdatePatientId("");
+      setUpdateFirstName("");
+      setUpdateLastName("");
+      setUpdateEmail("");
+      setUpdatePhone("");
+    } catch (err) {
+      setError(errorText(err, "Unable to update patient."));
+      setSuccessMessage("");
+    }
   };
 
-  const deletePatient = (patientId) => {
-    if (patientId === "") {
+  const deletePatient = async (idToDelete: number | string) => {
+    if (String(idToDelete).trim() === "") {
       setError("Please enter a patient ID.");
       return;
     }
 
-    fetch("http://192.168.86.25:8000/patients.php", {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        patient_id: patientId,
-      }),
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        console.log(data);
-
-        if (data.error) {
-          setSuccessMessage("");
-          setError(data.error);
-        } else {
-          setError("");
-          setSuccessMessage("Patient deleted successfully!");
-          setPatients(
-            patients.filter(
-              (patient) => String(patient.patient_id) !== String(patientId),
-            ),
-          );
-
-          setPatient(null);
-
-          setDeletePatientId("");
-        }
+    try {
+      await apiRequest(`${API_BASE_URL}/patients.php`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patient_id: idToDelete }),
       });
+
+      setError("");
+      setSuccessMessage("Patient deleted successfully!");
+      setPatients((current) =>
+        current.filter((p) => String(p.patient_id) !== String(idToDelete)),
+      );
+      setPatient(null);
+      setDeletePatientId("");
+    } catch (err) {
+      setSuccessMessage("");
+      setError(errorText(err, "Unable to delete patient."));
+    }
   };
 
-  const searchPatient = () => {
-    if (patientId !== "") {
-      setPatients([]);
-      setPatient(null);
+  const searchPatient = async () => {
+    setSuccessMessage("");
 
-      fetch(`http://192.168.86.25:8000/patients.php?id=${patientId}`)
-        .then((response) => response.json())
-        .then((data) => {
-          console.log(data);
+    try {
+      if (patientId.trim() !== "") {
+        const data = await apiRequest(
+          `${API_BASE_URL}/patients.php?id=${encodeURIComponent(patientId.trim())}`,
+        );
+        setPatients([]);
+        setPatient(data);
+        setError("");
+      } else if (patientName.trim() !== "") {
+        const data: Patient[] = await apiRequest(
+          `${API_BASE_URL}/patients.php?name=${encodeURIComponent(patientName.trim())}`,
+        );
+        setPatient(null);
 
-          if (data.error) {
-            setPatient(null);
-            setError(data.error);
-          } else {
-            setPatients([]);
-            setPatient(data);
-            setError("");
-          }
-        })
-        .catch((error) => {
-          console.log(error);
-        });
-    } else if (patientName !== "") {
-      fetch(`http://192.168.86.25:8000/patients.php?name=${patientName}`)
-        .then((response) => response.json())
-        .then((data) => {
-          console.log(data);
-
-          if (data.length === 0) {
-            setPatients([]);
-            setError("Patient not found");
-          } else {
-            setPatient(null);
-            setPatients(data);
-            setError("");
-          }
-        })
-        .catch((error) => {
-          console.log(error);
-        });
-    } else {
+        if (data.length === 0) {
+          setPatients([]);
+          setError("Patient not found");
+        } else {
+          setPatients(data);
+          setError("");
+        }
+      } else {
+        setPatient(null);
+        setPatients([]);
+        setError("Please enter a patient ID or name");
+      }
+    } catch (err) {
       setPatient(null);
       setPatients([]);
-      setError("Please enter a patient ID or name");
+      setError(errorText(err, "Search failed."));
     }
   };
 
   // Schedule a new appointment
   const scheduleAppointment = async () => {
-    // Make sure the required fields are filled in
     if (
       !appointmentPatientId.trim() ||
       !appointmentDoctorId.trim() ||
@@ -269,66 +255,36 @@ export default function HomeScreen() {
       return;
     }
 
-    // Combine the date and time into the format expected by PHP
     const appointmentDatetime = `${appointmentDate.trim()} ${appointmentTime.trim()}:00`;
 
     try {
-      const response = await fetch(
-        "http://192.168.86.25:8000/appointments.php",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            patient_id: Number(appointmentPatientId),
-            doctor_id: Number(appointmentDoctorId),
-            appointment_datetime: appointmentDatetime,
-            reason: appointmentReason.trim(),
-          }),
-        },
-      );
+      const data = await apiRequest(`${API_BASE_URL}/appointments.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patient_id: Number(appointmentPatientId),
+          doctor_id: Number(appointmentDoctorId),
+          appointment_datetime: appointmentDatetime,
+          reason: appointmentReason.trim(),
+        }),
+      });
 
-      // Read the API response, including any error message
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || `Server error: ${response.status}`);
-      }
-
-      // Show the success message
       setAppointmentMessage(data.message);
       setAppointmentError("");
-
-      // Clear the form after successful scheduling
       setAppointmentPatientId("");
       setAppointmentDoctorId("");
       setAppointmentDate("");
       setAppointmentTime("");
       setAppointmentReason("");
-
-      // Refresh the appointment list
-      const appointmentsResponse = await fetch(
-        "http://192.168.86.25:8000/appointments.php",
-      );
-
-      if (!appointmentsResponse.ok) {
-        throw new Error("Appointment saved, but the list could not refresh.");
-      }
-
-      const appointmentsData = await appointmentsResponse.json();
-      setAppointments(appointmentsData);
-    } catch (error) {
-      console.log("Schedule appointment failed:", error);
-
-      setAppointmentError(
-        error instanceof Error
-          ? error.message
-          : "Unable to schedule appointment.",
-      );
+    } catch (err) {
+      setAppointmentError(errorText(err, "Unable to schedule appointment."));
       setAppointmentMessage("");
+      return;
     }
+
+    await loadAppointments();
   };
+
   return (
     <ScrollView>
       <Text>Healthcare Operations</Text>
@@ -603,7 +559,7 @@ export default function HomeScreen() {
               setUpdateFirstName(patient.first_name);
               setUpdateLastName(patient.last_name);
               setUpdateEmail(patient.email);
-              setUpdatePhone(patient.phone);
+              setUpdatePhone(patient.phone ?? "");
             }}
           />
 
@@ -653,7 +609,7 @@ export default function HomeScreen() {
                 setUpdateFirstName(patient.first_name);
                 setUpdateLastName(patient.last_name);
                 setUpdateEmail(patient.email);
-                setUpdatePhone(patient.phone);
+                setUpdatePhone(patient.phone ?? "");
               }}
             />
             <Button
@@ -678,9 +634,9 @@ export default function HomeScreen() {
           Appointments
         </Text>
 
-        {appointmentError ? (
+        {appointmentsLoadError ? (
           <Text style={{ color: "red", marginBottom: 10 }}>
-            {appointmentError}
+            {appointmentsLoadError}
           </Text>
         ) : null}
 

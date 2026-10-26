@@ -1,4 +1,3 @@
-
 <?php
 
 header("Access-Control-Allow-Origin: *");
@@ -40,7 +39,6 @@ if ($_SERVER["REQUEST_METHOD"] === "GET") {
 
     exit;
 }
-
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
@@ -172,14 +170,31 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 :reason
             )";
 
-    $stmt = $conn->prepare($sql);
+    try {
+        $stmt = $conn->prepare($sql);
 
-    $stmt->execute([
-        "patient_id" => $patientId,
-        "doctor_id" => $doctorId,
-        "appointment_datetime" => $appointmentDatetime,
-        "reason" => $reason !== "" ? $reason : null
-    ]);
+        $stmt->execute([
+            "patient_id" => $patientId,
+            "doctor_id" => $doctorId,
+            "appointment_datetime" => $appointmentDatetime,
+            "reason" => $reason !== "" ? $reason : null
+        ]);
+    } catch (PDOException $e) {
+        // 23000 = duplicate key: another booking took this slot
+        // (the database also blocks cancelled appointments at the same time)
+        if ($e->getCode() === "23000") {
+            http_response_code(409);
+            echo json_encode([
+                "error" => "This doctor already has an appointment at that time"
+            ]);
+            exit;
+        }
+
+        error_log("appointments.php: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(["error" => "Unable to schedule appointment"]);
+        exit;
+    }
 
     http_response_code(201);
 

@@ -1,6 +1,6 @@
 CREATE DATABASE IF NOT EXISTS healthcare_app
   CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
-USE scratch_test;
+USE healthcare_app;
 
 CREATE TABLE IF NOT EXISTS patients (
   patient_id INT NOT NULL AUTO_INCREMENT,
