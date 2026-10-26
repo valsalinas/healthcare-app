@@ -1,4 +1,4 @@
-USE scratch_test;
+USE healthcare_app;
 
 INSERT INTO patients (patient_id, first_name, last_name, email, phone) VALUES
   (1, 'John',   'Doe',     'john@example.com',   '210-555-1002'),
