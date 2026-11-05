@@ -6,7 +6,7 @@ $url = "http://localhost:8000/appointments.php";
 $data = [
     "patient_id" => 12,
     "doctor_id" => 1,
-    "appointment_datetime" => "2026-11-10 10:00:00",
+    "appointment_datetime" => "2026-11-10 11:00:00",
     "reason" => "Routine checkup"
 ];
 
