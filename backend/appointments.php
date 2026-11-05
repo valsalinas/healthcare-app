@@ -182,7 +182,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     } catch (PDOException $e) {
         // 23000 = duplicate key: another booking took this slot
         // (the database also blocks cancelled appointments at the same time)
-        if ($e->getCode() === "23000") {
+        if ($e->getCode() === "23000" &&
+            isset($e->errorInfo[1]) &&
+            $e->errorInfo[1] === 1062
+        ){
             http_response_code(409);
             echo json_encode([
                 "error" => "This doctor already has an appointment at that time"
