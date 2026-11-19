@@ -613,6 +613,14 @@ export default function HomeScreen() {
             <Text>Phone: {patient.phone}</Text>
 
             <Button
+              title="View Appointments"
+              onPress={() => {
+                setPatient(patient);
+                setPatients([]);
+                setError("");
+              }}
+            />
+            <Button
               title="Edit Patient"
               onPress={() => {
                 setUpdatePatientId(String(patient.patient_id));
