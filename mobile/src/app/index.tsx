@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, ScrollView, Text, TextInput, View } from "react-native";
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
+import API_BASE_URL from "../config/api";
 
 type Patient = {
   patient_id: number;
@@ -56,6 +55,12 @@ export default function HomeScreen() {
 
   // Appointment state variables
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  // Filter appointments based on the searched patient
+  const filteredAppointments = patient
+    ? appointments.filter(
+        (appointment) => appointment.patient_id === patient.patient_id,
+      )
+    : [];
   const [appointmentPatientId, setAppointmentPatientId] = useState("");
   const [appointmentDoctorId, setAppointmentDoctorId] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
@@ -205,6 +210,11 @@ export default function HomeScreen() {
   };
 
   const searchPatient = async () => {
+    setSuccessMessage("");
+    // Clear previous search results before starting a new search
+    setPatient(null);
+    setPatients([]);
+    setError("");
     setSuccessMessage("");
 
     try {
@@ -640,10 +650,12 @@ export default function HomeScreen() {
           </Text>
         ) : null}
 
-        {appointments.length === 0 ? (
-          <Text>No appointments found.</Text>
+        {!patient ? (
+          <Text>Search for a patient to view their appointments.</Text>
+        ) : filteredAppointments.length === 0 ? (
+          <Text>No appointments found for this patient.</Text>
         ) : (
-          appointments.map((appointment) => (
+          filteredAppointments.map((appointment) => (
             <View
               key={appointment.appointment_id}
               style={{
