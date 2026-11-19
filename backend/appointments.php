@@ -1,7 +1,7 @@
 <?php
 
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json");
 
@@ -204,6 +204,83 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     echo json_encode([
         "message" => "Appointment scheduled successfully",
         "appointment_id" => $conn->lastInsertId()
+    ]);
+
+    exit;
+}
+// PUT: Cancel an appointment
+if ($_SERVER["REQUEST_METHOD"] === "PUT") {
+
+    $data = json_decode(file_get_contents("php://input"), true);
+
+    // Check that the request contains valid JSON
+    if (!is_array($data)) {
+        http_response_code(400);
+        echo json_encode([
+            "error" => "Invalid JSON request body"
+        ]);
+        exit;
+    }
+
+    // Get and validate the appointment ID
+    $appointmentId = filter_var(
+        $data["appointment_id"] ?? null,
+        FILTER_VALIDATE_INT
+    );
+
+    if (
+        $appointmentId === false ||
+        $appointmentId === null ||
+        $appointmentId < 1
+    ) {
+        http_response_code(400);
+        echo json_encode([
+            "error" => "A valid appointment ID is required"
+        ]);
+        exit;
+    }
+
+    // Check whether the appointment exists
+    $sql = "SELECT appointment_id, status
+            FROM appointments
+            WHERE appointment_id = :appointment_id";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([
+        "appointment_id" => $appointmentId
+    ]);
+
+    $appointment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$appointment) {
+        http_response_code(404);
+        echo json_encode([
+            "error" => "Appointment not found"
+        ]);
+        exit;
+    }
+
+    // Only scheduled appointments can be cancelled
+    if ($appointment["status"] !== "scheduled") {
+        http_response_code(409);
+        echo json_encode([
+            "error" => "Only scheduled appointments can be cancelled"
+        ]);
+        exit;
+    }
+
+    // Update the appointment status
+    $sql = "UPDATE appointments
+            SET status = 'cancelled'
+            WHERE appointment_id = :appointment_id";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([
+        "appointment_id" => $appointmentId
+    ]);
+
+    echo json_encode([
+        "message" => "Appointment cancelled successfully"
     ]);
 
     exit;

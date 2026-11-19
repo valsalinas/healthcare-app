@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { Button, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  Button,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import API_BASE_URL from "../config/api";
 
 type Patient = {
@@ -295,6 +302,35 @@ export default function HomeScreen() {
     await loadAppointments();
   };
 
+  // Cancel an existing appointment
+  const cancelAppointment = async (appointmentId: number) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to cancel this appointment?",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const data = await apiRequest(`${API_BASE_URL}/appointments.php`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appointment_id: appointmentId,
+        }),
+      });
+
+      setAppointmentMessage(data.message);
+      setAppointmentError("");
+
+      // Refresh the appointment list
+      await loadAppointments();
+    } catch (err) {
+      setAppointmentError(errorText(err, "Unable to cancel appointment."));
+      setAppointmentMessage("");
+    }
+  };
   return (
     <ScrollView>
       <Text>Healthcare Operations</Text>
@@ -684,6 +720,24 @@ export default function HomeScreen() {
               <Text>Date and time: {appointment.appointment_datetime}</Text>
               <Text>Reason: {appointment.reason || "Not provided"}</Text>
               <Text>Status: {appointment.status}</Text>
+
+              {appointment.status === "scheduled" ? (
+                <Pressable
+                  onPress={() => cancelAppointment(appointment.appointment_id)}
+                  style={{
+                    backgroundColor: "#007bff",
+                    paddingVertical: 8,
+                    paddingHorizontal: 12,
+                    borderRadius: 6,
+                    alignSelf: "flex-start",
+                    marginTop: 8,
+                  }}
+                >
+                  <Text style={{ color: "white", fontWeight: "bold" }}>
+                    Cancel Appointment
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           ))
         )}
